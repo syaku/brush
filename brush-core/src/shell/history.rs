@@ -1,6 +1,6 @@
 //! History management for shells.
 
-use std::{collections::BTreeSet, path::PathBuf};
+use std::collections::BTreeSet;
 
 use crate::{error, history::HistoryControl, openfiles};
 
@@ -41,10 +41,10 @@ impl<SE: crate::extensions::ShellExtensions> crate::Shell<SE> {
     }
 
     /// Returns the path to the history file used by the shell, if one is set.
-    pub fn history_file_path(&self) -> Option<PathBuf> {
+    pub fn history_file_path(&self) -> Option<crate::ResolvedPath> {
         self.env_str("HISTFILE")
             .filter(|s| !s.is_empty())
-            .map(|s| PathBuf::from(s.into_owned()))
+            .map(|s| self.absolute_path(s.as_ref()))
     }
 
     /// Returns the path to the history file used by the shell, if one is set.
@@ -63,7 +63,7 @@ impl<SE: crate::extensions::ShellExtensions> crate::Shell<SE> {
 
             // TODO(history): Observe options.append_to_history_file
             history.flush(
-                history_file_path,
+                &history_file_path,
                 true, /* append? */
                 true, /* unsaved items only? */
                 write_timestamps,

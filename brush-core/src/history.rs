@@ -4,7 +4,6 @@ use chrono::Utc;
 use std::{
     collections::BTreeSet,
     io::{BufRead, Read, Write},
-    path::Path,
 };
 
 use crate::error;
@@ -199,11 +198,16 @@ impl History {
     /// * `write_timestamps` - Whether to write timestamps for each command line.
     pub fn flush(
         &mut self,
-        history_file_path: impl AsRef<Path>,
+        history_file_path: &crate::ResolvedPath,
         append: bool,
         unsaved_items_only: bool,
         write_timestamps: bool,
     ) -> Result<(), error::Error> {
+        // With nothing unsaved to write, leave the file alone; like bash, don't even create it.
+        if unsaved_items_only && !self.items.iter().any(|item| item.dirty) {
+            return Ok(());
+        }
+
         // Open the file
         let mut file_options = std::fs::File::options();
 
@@ -213,8 +217,8 @@ impl History {
             file_options.write(true).truncate(true);
         }
 
-        let mut file =
-            std::io::BufWriter::new(file_options.create(true).open(history_file_path.as_ref())?);
+        file_options.create(true);
+        let mut file = std::io::BufWriter::new(history_file_path.open(&file_options)?);
 
         let mut written = Vec::new();
         for (index, item) in self.items.iter().enumerate() {
@@ -786,6 +790,7 @@ mod tests {
     fn flush_writes_unsaved_items_once() -> Result<(), error::Error> {
         let dir = tempfile::tempdir()?;
         let path = dir.path().join("history");
+        let resolved = crate::ResolvedPath::try_from(path.clone())?;
         let read = || std::fs::read_to_string(&path);
 
         // Imported items are already saved; added ones aren't.
@@ -793,12 +798,12 @@ mod tests {
         history.add(Item::new("new1"))?;
         history.add(Item::new("new2"))?;
 
-        history.flush(&path, true, true, false)?;
+        history.flush(&resolved, true, true, false)?;
         assert_eq!(read()?, "new1\nnew2\n");
-        history.flush(&path, true, true, false)?;
+        history.flush(&resolved, true, true, false)?;
         assert_eq!(read()?, "new1\nnew2\n");
 
-        history.flush(&path, false, false, false)?;
+        history.flush(&resolved, false, false, false)?;
         assert_eq!(read()?, "old\nnew1\nnew2\n");
 
         Ok(())
@@ -945,6 +950,7 @@ mod tests {
     fn flush_and_import_round_trip_with_timestamps() -> Result<(), error::Error> {
         let dir = tempfile::tempdir()?;
         let path = dir.path().join("history");
+        let resolved = crate::ResolvedPath::try_from(path.clone())?;
         std::fs::write(&path, "existing\n")?;
 
         let mut history = History::default();
@@ -956,7 +962,7 @@ mod tests {
             timestamp: None,
             ..Item::new("b")
         })?;
-        history.flush(&path, true, true, true)?;
+        history.flush(&resolved, true, true, true)?;
         assert_eq!(
             std::fs::read_to_string(&path)?,
             "existing\n#1700000000\na\nb\n"
