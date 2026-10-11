@@ -133,8 +133,7 @@ impl<SE: crate::extensions::ShellExtensions> crate::Shell<SE> {
         params: &ExecutionParameters,
         call_type: callstack::ScriptCallType,
     ) -> Result<ExecutionResult, error::Error> {
-        let mut reader = std::io::BufReader::new(file);
-        let mut parser = brush_parser::Parser::new(&mut reader, &self.parser_options());
+        let mut parser = super::parsing::create_parser(file, &self.parser_options());
 
         tracing::debug!(target: trace_categories::PARSE, "Parsing sourced file: {}", source_info.source);
         let parse_result = parser.parse_program();

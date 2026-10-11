@@ -61,6 +61,13 @@ pub const fn default_case_insensitive_path_expansion() -> bool {
     false
 }
 
+/// Returns true if shell input should read each `\r\n` as `\n`.
+///
+/// In the stub implementation, this returns `false`.
+pub const fn reads_crlf_as_lf() -> bool {
+    false
+}
+
 /// Returns true if the string contains a path separator character.
 ///
 /// In the stub implementation, only `/` is considered a path separator.

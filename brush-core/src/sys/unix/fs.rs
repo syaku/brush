@@ -263,6 +263,13 @@ pub const fn default_case_insensitive_path_expansion() -> bool {
     false
 }
 
+/// Returns true if shell input should read each `\r\n` as `\n`.
+///
+/// On Unix, a `\r` is part of the line, as in bash, so this returns `false`.
+pub const fn reads_crlf_as_lf() -> bool {
+    false
+}
+
 /// Finds the byte index of the last path separator in the string.
 ///
 /// On Unix, only `/` is considered a path separator.
