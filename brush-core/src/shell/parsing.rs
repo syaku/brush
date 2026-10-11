@@ -2,7 +2,7 @@
 
 use std::io::Read;
 
-use crate::{Shell, extensions, trace_categories};
+use crate::{Shell, extensions, ioutils, trace_categories};
 
 impl<SE: extensions::ShellExtensions> Shell<SE> {
     /// Parses the given reader as a shell program, returning the resulting Abstract Syntax Tree
@@ -63,7 +63,33 @@ fn parse_string_impl(
 pub(super) fn create_parser<R: Read>(
     r: R,
     parser_options: &brush_parser::ParserOptions,
-) -> brush_parser::Parser<std::io::BufReader<R>> {
-    let reader = std::io::BufReader::new(r);
+) -> brush_parser::Parser<std::io::BufReader<ioutils::ShellInputReader<R>>> {
+    let reader = std::io::BufReader::new(ioutils::ShellInputReader::new(
+        r,
+        crate::sys::fs::reads_crlf_as_lf(),
+    ));
     brush_parser::Parser::new(reader, parser_options)
+}
+
+#[cfg(test)]
+#[cfg(windows)] // ast-grep-ignore: platform-cfg-outside-sys
+#[expect(clippy::panic_in_result_fn)]
+mod tests {
+    use super::*;
+
+    const LF_SCRIPT: &str = "f() {\n  echo 'a b'\n}\nf\n";
+
+    fn parse(s: &str) -> Result<String, brush_parser::ParseError> {
+        let options = brush_parser::ParserOptions::default();
+        Ok(create_parser(s.as_bytes(), &options)
+            .parse_program()?
+            .to_string())
+    }
+
+    #[test]
+    fn crlf_script_parses_like_lf_script() -> Result<(), brush_parser::ParseError> {
+        let crlf_script = LF_SCRIPT.replace('\n', "\r\n");
+        assert_eq!(parse(&crlf_script)?, parse(LF_SCRIPT)?);
+        Ok(())
+    }
 }

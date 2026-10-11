@@ -208,6 +208,15 @@ pub const fn default_case_insensitive_path_expansion() -> bool {
     true
 }
 
+/// Returns true if shell input should read each `\r\n` as `\n`.
+///
+/// On Windows, scripts and the init code that tools emit for bash often end lines with
+/// `\r\n`, and the bash shipped with Git for Windows (MSYS2) reads them as `\n`, so this
+/// returns `true`.
+pub const fn reads_crlf_as_lf() -> bool {
+    true
+}
+
 /// Path separator characters on Windows.
 const PATH_SEPARATORS: [char; 2] = ['/', '\\'];
 
