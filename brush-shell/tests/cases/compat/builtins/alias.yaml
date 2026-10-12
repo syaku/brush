@@ -157,6 +157,55 @@ cases:
       alias echo='echo prefix'
       echo hello
 
+  - name: "Alias referencing to alias"
+    stdin: |
+      shopt -s expand_aliases
+      alias myalias=echo
+      alias outeralias=myalias
+      outeralias 'hello'
+
+  - name: "Alias referencing to alias with args"
+    stdin: |
+      shopt -s expand_aliases
+      alias inner='echo inner-ran'
+      alias outer='inner -x'
+      alias outermost='outer -y'
+      outer
+      outermost z
+
+  - name: "Alias referencing to a self-referencing alias"
+    stdin: |
+      shopt -s expand_aliases
+      alias echo='echo prefix'
+      alias e='echo -n'
+      e hello
+      echo
+
+  - name: "Mutually referencing aliases stop expanding"
+    stdin: |
+      shopt -s expand_aliases
+      alias a='b x'
+      alias b='a y'
+      a 2>/dev/null || echo "a: $?"
+      b 2>/dev/null || echo "b: $?"
+
+  - name: "Alias body word that expands to an alias name is not re-expanded"
+    stdin: |
+      shopt -s expand_aliases
+      alias inner='echo inner-ran'
+      alias outer='$CMD arg'
+      CMD=echo
+      outer
+      CMD=inner
+      outer 2>/dev/null || echo "not-expanded: $?"
+
+  - name: "Quoted alias body word is not re-expanded"
+    stdin: |
+      shopt -s expand_aliases
+      alias inner='echo inner-ran'
+      alias outer='"inner" arg'
+      outer 2>/dev/null || echo "not-expanded: $?"
+
   - name: "Aliases are not expanded when expand_aliases is unset"
     stdin: |
       alias x='echo aliased'
@@ -239,14 +288,6 @@ cases:
       alias otherother='also-replaced'
 
       cmd other otherother
-
-  - name: "Alias referencing to alias"
-    known_failure: true # Issue #57
-    stdin: |
-      shopt -s expand_aliases
-      alias myalias=echo
-      alias outeralias=myalias
-      outeralias 'hello'
 
   - name: "Alias to keywords"
     known_failure: true # Issue #286

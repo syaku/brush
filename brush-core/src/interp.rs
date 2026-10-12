@@ -1340,7 +1340,11 @@ impl<SE: extensions::ShellExtensions> ExecuteInPipeline<SE> for ast::SimpleComma
                                 //
                                 // N.B. Tokenizing first releases our borrow of the shell's aliases,
                                 // so we can take a mutable borrow of the shell to expand the words.
-                                let alias_words = tokenize_alias_body(&context.shell, alias_value);
+                                let alias_words = substitute_nested_aliases(
+                                    &context.shell,
+                                    cmd_name,
+                                    alias_value,
+                                );
                                 let mut alias_pieces =
                                     expand_words(&mut context.shell, &params, alias_words).await?;
 
@@ -1497,12 +1501,38 @@ async fn execute_command(
     cmd.execute().await
 }
 
-/// Tokenizes the body of an alias into the unexpanded words that should replace the aliased command
-/// name.
+/// Tokenizes the body of the alias named `alias_name` into the unexpanded words that should replace
+/// the aliased command name. As in bash, if the first word of the body is itself an alias, it's
+/// substituted in turn, but no alias is substituted more than once (so `alias ls='ls -F'`
+/// terminates).
+///
+/// The first word is checked before word expansion, so a body word that only expands to an alias
+/// name (e.g., `$cmd`) or that is quoted is not substituted.
+fn substitute_nested_aliases(
+    shell: &Shell<impl extensions::ShellExtensions>,
+    alias_name: &str,
+    alias_value: &str,
+) -> Vec<String> {
+    let mut words = tokenize_alias_body(shell, alias_value);
+    let mut substituted = vec![alias_name.to_owned()];
+
+    while let Some(first_word) = words.first()
+        && !substituted.contains(first_word)
+        && let Some(nested_value) = shell.aliases().get(first_word.as_str())
+    {
+        substituted.push(first_word.clone());
+        words.splice(0..1, tokenize_alias_body(shell, nested_value));
+    }
+
+    words
+}
+
+/// Tokenizes the body of an alias into the unexpanded words it consists of.
 ///
 /// This only handles alias bodies that amount to a simple sequence of words; bodies containing
-/// operators (pipes, redirections, `&&`, ...) and recursive expansion of chained aliases require
-/// alias substitution to happen in the tokenizer instead (see issue #57).
+/// operators (pipes, redirections, `&&`, ...) or ending in a blank (which subjects the next word
+/// to alias substitution) require alias substitution to happen in the tokenizer instead (see
+/// issue #57).
 fn tokenize_alias_body(
     shell: &Shell<impl extensions::ShellExtensions>,
     alias_value: &str,
