@@ -148,3 +148,13 @@ pub fn resolve_executable(path: crate::ResolvedPath) -> Option<crate::ResolvedPa
 pub(crate) const fn make_executable(_path: &std::path::Path) -> std::io::Result<()> {
     Ok(())
 }
+
+/// Resolves a path to a potential executable.
+///
+/// Platforms without PATHEXT resolution leave the path unchanged.
+pub(crate) fn resolve_executable_path(
+    path: std::path::PathBuf,
+    _working_dir: &crate::ResolvedPath,
+) -> std::path::PathBuf {
+    path
+}

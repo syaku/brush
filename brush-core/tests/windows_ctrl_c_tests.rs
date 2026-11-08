@@ -30,7 +30,7 @@ fn cmd_exit(code: &str) -> String {
 
 async fn run(shell: &mut brush_core::Shell, script: &str) -> Result<()> {
     let params = shell.default_exec_params();
-    shell
+    let _ = shell
         .run_string(script, &brush_core::SourceInfo::default(), &params)
         .await?;
     Ok(())

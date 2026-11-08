@@ -41,7 +41,7 @@ async fn new_shell() -> Result<brush_core::Shell> {
 
     let comspec =
         std::env::var("ComSpec").unwrap_or_else(|_| r"C:\Windows\System32\cmd.exe".into());
-    run(&mut shell, &std::format!("cmd='{comspec}'")).await?;
+    let _ = run(&mut shell, &std::format!("cmd='{comspec}'")).await?;
 
     Ok(shell)
 }
@@ -62,7 +62,7 @@ fn is_set(shell: &brush_core::Shell, name: &str) -> bool {
 async fn ctrl_c_exit_leaves_while_loop_and_stops_what_follows() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(
+    let _ = run(
         &mut shell,
         &std::format!("while :; do {CTRL_C_EXIT}; done; after=1"),
     )
@@ -78,7 +78,7 @@ async fn ctrl_c_exit_leaves_while_loop_and_stops_what_follows() -> Result<()> {
 async fn ctrl_c_exit_leaves_until_loop_from_its_condition() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(
+    let _ = run(
         &mut shell,
         &std::format!("until {CTRL_C_EXIT}; do body=1; done"),
     )
@@ -95,7 +95,7 @@ async fn ctrl_c_exit_leaves_until_loop_from_its_condition() -> Result<()> {
 async fn ctrl_c_exit_leaves_for_loop() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(
+    let _ = run(
         &mut shell,
         &std::format!("for i in 1 2; do last=$i; {CTRL_C_EXIT}; done"),
     )
@@ -111,7 +111,7 @@ async fn ctrl_c_exit_leaves_for_loop() -> Result<()> {
 async fn ctrl_c_exit_leaves_arithmetic_for_loop() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(
+    let _ = run(
         &mut shell,
         &std::format!("for ((i = 0; i < 2; i++)); do last=$i; {CTRL_C_EXIT}; done"),
     )
@@ -127,7 +127,7 @@ async fn ctrl_c_exit_leaves_arithmetic_for_loop() -> Result<()> {
 async fn ctrl_c_exit_stops_the_next_command_in_a_list() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(&mut shell, &std::format!("{CTRL_C_EXIT}; after=1")).await?;
+    let _ = run(&mut shell, &std::format!("{CTRL_C_EXIT}; after=1")).await?;
 
     assert!(!is_set(&shell, "after"));
 
@@ -138,7 +138,7 @@ async fn ctrl_c_exit_stops_the_next_command_in_a_list() -> Result<()> {
 async fn ctrl_c_exit_stops_and_or_list_and_the_next_command() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(&mut shell, &std::format!("{CTRL_C_EXIT} || a=1; b=1")).await?;
+    let _ = run(&mut shell, &std::format!("{CTRL_C_EXIT} || a=1; b=1")).await?;
 
     assert!(!is_set(&shell, "a"));
     assert!(!is_set(&shell, "b"));
@@ -150,7 +150,7 @@ async fn ctrl_c_exit_stops_and_or_list_and_the_next_command() -> Result<()> {
 async fn ctrl_c_exit_in_function_stops_the_caller() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(
+    let _ = run(
         &mut shell,
         &std::format!("f() {{ {CTRL_C_EXIT}; inner=1; }}; f; after=1"),
     )
@@ -166,7 +166,7 @@ async fn ctrl_c_exit_in_function_stops_the_caller() -> Result<()> {
 async fn ctrl_c_exit_in_eval_stops_the_caller() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(&mut shell, &std::format!("eval '{CTRL_C_EXIT}'; after=1")).await?;
+    let _ = run(&mut shell, &std::format!("eval '{CTRL_C_EXIT}'; after=1")).await?;
 
     assert!(!is_set(&shell, "after"));
 
@@ -182,7 +182,7 @@ async fn ctrl_c_exit_in_sourced_file_stops_the_file_and_the_caller() -> Result<(
     writeln!(script, "rest=1")?;
     script.flush()?;
 
-    run(
+    let _ = run(
         &mut shell,
         &std::format!("source '{}'; after=1", script.path().display()),
     )
@@ -198,7 +198,7 @@ async fn ctrl_c_exit_in_sourced_file_stops_the_file_and_the_caller() -> Result<(
 async fn ctrl_c_exit_in_subshell_stops_the_parent() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(&mut shell, &std::format!("({CTRL_C_EXIT}); after=1")).await?;
+    let _ = run(&mut shell, &std::format!("({CTRL_C_EXIT}); after=1")).await?;
 
     assert!(!is_set(&shell, "after"));
 
@@ -209,7 +209,7 @@ async fn ctrl_c_exit_in_subshell_stops_the_parent() -> Result<()> {
 async fn ctrl_c_exit_in_command_substitution_stops_the_parent() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(&mut shell, &std::format!("v=$({CTRL_C_EXIT}); after=1")).await?;
+    let _ = run(&mut shell, &std::format!("v=$({CTRL_C_EXIT}); after=1")).await?;
 
     assert!(!is_set(&shell, "after"));
 
@@ -220,7 +220,7 @@ async fn ctrl_c_exit_in_command_substitution_stops_the_parent() -> Result<()> {
 async fn ctrl_c_exit_in_pipeline_stops_what_follows() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(
+    let _ = run(
         &mut shell,
         &std::format!("{CTRL_C_EXIT} | {SUCCESS}; after=1"),
     )
@@ -237,7 +237,7 @@ async fn ctrl_c_exit_in_compound_stage_skips_later_stages() -> Result<()> {
 
     // With compound stages running concurrently (#1411), the last stage starts before the
     // brace group ends and the pipeline reports its status, so check what follows instead.
-    run(
+    let _ = run(
         &mut shell,
         &std::format!("{{ {CTRL_C_EXIT}; }} | {SUCCESS}; after=1"),
     )
@@ -252,7 +252,7 @@ async fn ctrl_c_exit_in_compound_stage_skips_later_stages() -> Result<()> {
 async fn ctrl_c_exit_in_if_condition_runs_no_branch() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(
+    let _ = run(
         &mut shell,
         &std::format!("if {CTRL_C_EXIT}; then t=1; else e=1; fi"),
     )
@@ -268,7 +268,7 @@ async fn ctrl_c_exit_in_if_condition_runs_no_branch() -> Result<()> {
 async fn ctrl_c_exit_in_case_branch_does_not_fall_through() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(
+    let _ = run(
         &mut shell,
         &std::format!("case a in a) {CTRL_C_EXIT} ;& b) b=1 ;; esac"),
     )
@@ -294,7 +294,7 @@ async fn ctrl_c_exit_under_errexit_does_not_exit_the_shell() -> Result<()> {
 async fn ctrl_c_exit_does_not_fire_err_trap() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(&mut shell, &std::format!("trap 'err=1' ERR; {CTRL_C_EXIT}")).await?;
+    let _ = run(&mut shell, &std::format!("trap 'err=1' ERR; {CTRL_C_EXIT}")).await?;
 
     assert!(!is_set(&shell, "err"));
 
@@ -307,7 +307,7 @@ async fn ctrl_c_exit_does_not_fire_err_trap() -> Result<()> {
 async fn ctrl_c_exit_in_process_substitution_stops_the_reader() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(
+    let _ = run(
         &mut shell,
         &std::format!("while read l; do :; done < <({CTRL_C_EXIT}); after=1"),
     )
@@ -323,7 +323,7 @@ async fn ctrl_c_exit_in_background_list_does_not_stop_the_foreground() -> Result
     let mut shell = new_shell().await?;
 
     // `wait` makes sure the background command has ended before `after=1` runs.
-    run(&mut shell, &std::format!("{CTRL_C_EXIT} & wait; after=1")).await?;
+    let _ = run(&mut shell, &std::format!("{CTRL_C_EXIT} & wait; after=1")).await?;
 
     assert!(is_set(&shell, "after"));
 
@@ -334,7 +334,7 @@ async fn ctrl_c_exit_in_background_list_does_not_stop_the_foreground() -> Result
 async fn ordinary_failure_does_not_stop_what_follows() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(&mut shell, &std::format!("{ORDINARY_FAILURE}; after=1")).await?;
+    let _ = run(&mut shell, &std::format!("{ORDINARY_FAILURE}; after=1")).await?;
 
     assert!(is_set(&shell, "after"));
 
@@ -345,8 +345,8 @@ async fn ordinary_failure_does_not_stop_what_follows() -> Result<()> {
 async fn each_top_level_run_starts_uninterrupted() -> Result<()> {
     let mut shell = new_shell().await?;
 
-    run(&mut shell, CTRL_C_EXIT).await?;
-    run(&mut shell, "after=1").await?;
+    let _ = run(&mut shell, CTRL_C_EXIT).await?;
+    let _ = run(&mut shell, "after=1").await?;
 
     assert!(is_set(&shell, "after"));
 

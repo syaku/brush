@@ -1,12 +1,12 @@
 use brush_core::{ErrorKind, ExecutionResult, builtins};
 use cfg_if::cfg_if;
-use clap::Parser;
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 use nix::sys::stat::Mode;
 use std::io::Write;
 
 /// Manage the process umask.
-#[derive(Parser)]
+#[derive(winnow_args::Args)]
+#[arg(disable_help_short, disable_version_flag, disable_help_subcommand)]
 pub(crate) struct UmaskCommand {
     /// If MODE is omitted, output in a form that may be reused as input.
     #[arg(short = 'p')]
@@ -17,19 +17,36 @@ pub(crate) struct UmaskCommand {
     symbolic_output: bool,
 
     /// Mode mask.
+    #[arg(positional)]
     mode: Option<String>,
 }
 
-impl builtins::Command for UmaskCommand {
+brush_winnow_args_adapter::impl_parse_args!(UmaskCommand);
+
+impl<SE: brush_core::ShellExtensions> builtins::Builtin<SE> for UmaskCommand {
     type Error = brush_core::Error;
 
-    async fn execute<SE: brush_core::ShellExtensions>(
-        &self,
+    async fn execute(
+        self,
         context: brush_core::ExecutionContext<'_, SE>,
     ) -> Result<brush_core::ExecutionResult, Self::Error> {
         if let Some(mode) = &self.mode {
-            if mode.starts_with(|c: char| c.is_digit(8)) {
-                let parsed = brush_core::int_utils::parse(mode.as_str(), 8)?;
+            if mode.starts_with(|c: char| c.is_ascii_digit()) {
+                // Like bash, take any mode that starts with a digit as octal, and refuse
+                // one with a digit that isn't octal or a value past 07777.
+                let parsed = brush_core::int_utils::parse::<nix::sys::stat::mode_t>(mode, 8)
+                    .ok()
+                    .filter(|value| *value <= 0o7777);
+
+                let Some(parsed) = parsed else {
+                    writeln!(
+                        context.stderr(),
+                        "{}: {mode}: octal number out of range",
+                        context.command_name
+                    )?;
+                    return Ok(ExecutionResult::general_error());
+                };
+
                 set_umask(parsed)?;
             } else {
                 return brush_core::error::unimp("umask setting mode from symbolic value");

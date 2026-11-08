@@ -26,6 +26,8 @@ mod reporting;
 mod runner;
 mod testcase;
 pub mod util;
+#[cfg(windows)]
+mod windows_job;
 
 pub use comparison::{
     DirComparison, DirComparisonEntry, DurationComparison, ExitStatusComparison,

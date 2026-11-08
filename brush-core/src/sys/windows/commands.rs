@@ -12,6 +12,7 @@ use std::{
 pub use crate::sys::stubs::commands::{
     CommandExt, CommandFdInjectionExt, CommandFgControlExt, ExitStatusExt,
 };
+pub(crate) use crate::sys::stubs::commands::{exec, stdio_for};
 
 /// Sets the arguments to be passed to the given command.
 ///

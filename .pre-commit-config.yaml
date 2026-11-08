@@ -94,10 +94,30 @@ repos:
         exclude: \.rs$
 
   # ---------------------------------------------------------------------------
+  # Schema validation for release-plz.toml, so a misspelled key or wrong type
+  # fails here instead of at release time. The schema is the one release-plz
+  # publishes, as of a release-plz release tag. Dependabot doesn't track that
+  # URL; bump the tag by hand when adopting newer release-plz config.
+  # check-jsonschema caches the download, so only the first run needs the
+  # network.
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: a76b92851fc9eede9f9bc4073eb55202f34eb0df # frozen: 0.39.0
+    hooks:
+      - id: check-jsonschema
+        name: Validate release-plz.toml
+        files: ^release-plz\.toml$
+        # Upstream's manifest limits this hook to [json, yaml].
+        types_or: [toml]
+        args:
+          - --schemafile
+          - https://raw.githubusercontent.com/release-plz/release-plz/release-plz-v0.4.3/.schema/latest.json
+
+  # ---------------------------------------------------------------------------
   # Spelling. Configured by Cargo.toml [workspace.metadata.typos].
   # ---------------------------------------------------------------------------
   - repo: https://github.com/crate-ci/typos
-    rev: 00f422f3b19c57bc6338715ebfe3316d38768461 # frozen: v1.50.3
+    rev: b859c0df7f391deba73030f79b957e62b4d81dc6 # frozen: varcon-core-v5.0.7
     hooks:
       - id: typos
         alias: spelling
@@ -116,7 +136,7 @@ repos:
   # .github/workflows/workflow-checks.yaml and is not redundant with it.
   # ---------------------------------------------------------------------------
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: fa412071e4f5d44d44f9e365f4676f9df92456a2 # frozen: v1.30.1
+    rev: c92afdf2c6ca336aaa8f39e2bd8d48f62dbd8e1f # frozen: v1.31.1
     hooks:
       - id: zizmor
         alias: workflows
@@ -163,7 +183,7 @@ repos:
   # hook would avoid it, but Dependabot skips those.
   # ---------------------------------------------------------------------------
   - repo: https://github.com/boidolr/ast-grep-pre-commit
-    rev: 7bae9c67e1a003cd5ef629c64f0466dc46556b3b # frozen: 0.45.3
+    rev: 13126a89e67880b0dac82cf40350abd2cfedd458 # frozen: 0.51.0
     hooks:
       - id: ast-grep
         alias: structure
@@ -182,7 +202,7 @@ repos:
   # git-cliff and release-plz.
   # ---------------------------------------------------------------------------
   - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: 91ab4bf57e58b32adf1a122681f6ebe164d081c8 # frozen: v4.4.0
+    rev: 33b50eb042bee26eac0ee96ad84aa9c1b4dccdd8 # frozen: v4.5.0
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]

@@ -3,6 +3,7 @@ pub mod commands;
 pub(crate) mod env;
 pub use crate::sys::stubs::fd;
 pub(crate) mod fs;
+pub(crate) use crate::sys::os_pipes as pipes;
 pub use crate::sys::stubs::input;
 pub(crate) mod network;
 pub use crate::sys::stubs::poll;
@@ -11,7 +12,7 @@ pub use crate::sys::stubs::resource;
 /// Signal processing utilities
 pub mod signal {
     pub(crate) use crate::sys::stubs::signal::*;
-    pub(crate) use tokio::signal::ctrl_c as await_ctrl_c;
+    pub use tokio::signal::ctrl_c as await_ctrl_c;
 
     /// `STATUS_CONTROL_C_EXIT`, the status Windows gives a process that Ctrl-C ended.
     #[expect(clippy::cast_possible_wrap, reason = "an NTSTATUS is read as an i32")]
@@ -65,6 +66,7 @@ pub mod signal {
 
 pub use crate::sys::stubs::terminal;
 pub mod process;
+pub(crate) use crate::sys::tokio_tasks as tasks;
 pub(crate) mod users;
 
 /// Platform-specific errors.

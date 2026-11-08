@@ -326,6 +326,16 @@ pub(crate) fn make_executable(path: &Path) -> std::io::Result<()> {
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))
 }
 
+/// Resolves a path to a potential executable.
+///
+/// Unix does not need PATHEXT resolution, so the path is left unchanged.
+pub(crate) const fn resolve_executable_path(
+    path: PathBuf,
+    _working_dir: &crate::ResolvedPath,
+) -> PathBuf {
+    path
+}
+
 #[cfg(test)]
 #[expect(clippy::panic_in_result_fn)]
 mod tests {
