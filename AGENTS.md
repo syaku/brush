@@ -2,6 +2,17 @@
 
 This guide helps AI agents work efficiently on the `brush` codebase by providing essential context about architecture, patterns, and development workflows.
 
+## Required: Independent Implementation
+
+Before investigating or implementing a change, read and follow the
+[independent-implementation and provenance policy](CONTRIBUTING.md#independent-implementation-and-provenance).
+It is the canonical policy for contributors and all agents, including delegated
+agents and their tools. Use Bash as a black-box behavioral oracle, not as
+implementation source material. If you encounter Bash implementation material,
+stop implementation and disclose the exposure; do not translate, summarize, or
+rewrite it into brush. Disclose this to the human contributor to clarify how
+to proceed.
+
 ## 1. Architecture Overview & Navigation
 
 ### Architecture
@@ -32,8 +43,8 @@ the architecture changes.
 ### Module Dependencies
 
 ```text
-brush-shell → brush-interactive → brush-core → brush-parser
-            ↘ brush-builtins ↗
+brush-shell → brush-interactive ─────────────────────────→ brush-core → brush-parser
+            ↘ brush-builtins → brush-winnow-args-adapter ↗
 ```
 
 ## 2. Testing Strategy
@@ -233,6 +244,7 @@ cargo xtask ci full
 cargo xtask check fmt      # Format check
 cargo xtask check lint     # Clippy
 cargo xtask check build    # Compilation check
+cargo xtask check crates   # Crate structure (e.g. LICENSE symlinks)
 cargo xtask check schemas  # Schema drift check
 cargo xtask check hooks  # prek hooks: file hygiene, typos, zizmor, lychee, cargo-deny, ast-grep
 cargo xtask check hooks deps  # One hook, by id or alias

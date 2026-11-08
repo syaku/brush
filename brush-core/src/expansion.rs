@@ -1172,11 +1172,15 @@ impl<'a, SE: extensions::ShellExtensions> WordExpander<'a, SE> {
                 Ok(self.shell.working_dir().as_path().to_string_lossy())
             }
             brush_parser::word::TildeExpr::OldWorkingDir => {
-                if let Some(old_pwd) = self.shell.env_str("OLDPWD") {
-                    Ok(old_pwd)
-                } else {
-                    Ok(Cow::Borrowed("~-"))
-                }
+                // OLDPWD may be declared without a value (e.g. at startup); only
+                // expand `~-` when it actually has one.
+                Ok(self
+                    .shell
+                    .env_var("OLDPWD")
+                    .filter(|var| var.value().is_set())
+                    .map_or(Cow::Borrowed("~-"), |var| {
+                        var.value().to_cow_str(self.shell)
+                    }))
             }
             brush_parser::word::TildeExpr::NthDirFromBottomOfDirStack { n } => {
                 let dir_stack_count = self.shell.directory_stack().len();
@@ -1372,6 +1376,13 @@ impl<'a, SE: extensions::ShellExtensions> WordExpander<'a, SE> {
                         brush_parser::word::ParameterTestType::Unset,
                         ParameterState::DefinedEmptyString,
                     ) => Ok(self.expand_parameter_word(alternative_value).await?),
+                    // "${arr[@]+word}" or "${@+word}" with no elements expands to nothing
+                    // (zero words), just as "${arr[@]}" and "$@" do.
+                    _ if !expanded_parameter.concatenate
+                        && expanded_parameter.fields.is_empty() =>
+                    {
+                        Ok(expanded_parameter)
+                    }
                     _ => Ok(Expansion::from(String::new())),
                 }
             }
@@ -2151,6 +2162,11 @@ impl<'a, SE: extensions::ShellExtensions> WordExpander<'a, SE> {
         replacement: &str,
         match_kind: &SubstringMatchKind,
     ) -> String {
+        // The replacement is already fully expanded; it must be inserted verbatim. A bare
+        // `&str` replacer would instead read `$1`, `$0` and `${name}` as references to the
+        // regex's capture groups.
+        let replacement = fancy_regex::NoExpand(replacement);
+
         match match_kind {
             brush_parser::word::SubstringMatchKind::Prefix
             | brush_parser::word::SubstringMatchKind::Suffix
@@ -2407,6 +2423,26 @@ mod tests {
         assert_eq!(
             expand("{a,b{1,2}}"),
             Some(vec!["a".into(), "b1".into(), "b2".into()])
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_replace_substring_inserts_replacement_verbatim() -> Result<()> {
+        // A capture group, as an extglob pattern like `@(b)` produces.
+        let regex = fancy_regex::Regex::new("(b)")?;
+        let replace = |r: &str, kind: SubstringMatchKind| {
+            WordExpander::<crate::extensions::DefaultShellExtensions>::replace_substring(
+                "abcb", &regex, r, &kind,
+            )
+        };
+
+        assert_eq!(replace("$1", SubstringMatchKind::FirstOccurrence), "a$1cb");
+        assert_eq!(replace("$0", SubstringMatchKind::Anywhere), "a$0c$0");
+        assert_eq!(
+            replace("${y}$$", SubstringMatchKind::Anywhere),
+            "a${y}$$c${y}$$"
         );
 
         Ok(())

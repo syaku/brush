@@ -251,14 +251,17 @@ impl TestCase {
                 if let Some(expectation) = line.strip_prefix("#expect:") {
                     if let Err(inner) = p.expect(expectation) {
                         return Ok(RunResult {
-                            exit_status: ExitStatus::from_raw(1),
-                            stdout: read_expectrl_log(log).unwrap_or_default(),
+                            exit_status: exited_with(1),
+                            stdout: read_expectrl_log(log)
+                                .map(make_expectrl_output_readable)
+                                .unwrap_or_default(),
                             stderr: std::format!("failed to expect '{expectation}': {inner}"),
                             duration: start_time.elapsed(),
                         });
                     }
                 } else if let Some(control_code) = line.strip_prefix("#send:") {
                     match control_code.to_lowercase().as_str() {
+                        "ctrl+c" => p.send(expectrl::ControlCode::EndOfText)?,
                         "ctrl+d" => p.send(expectrl::ControlCode::EndOfTransmission)?,
                         "tab" => p.send(expectrl::ControlCode::HorizontalTabulation)?,
                         "enter" => p.send(expectrl::ControlCode::LineFeed)?,
@@ -267,8 +270,10 @@ impl TestCase {
                 } else if line.trim() == "#expect-prompt" {
                     if let Err(inner) = p.expect("test$ ") {
                         return Ok(RunResult {
-                            exit_status: ExitStatus::from_raw(1),
-                            stdout: read_expectrl_log(log).unwrap_or_default(),
+                            exit_status: exited_with(1),
+                            stdout: read_expectrl_log(log)
+                                .map(make_expectrl_output_readable)
+                                .unwrap_or_default(),
                             stderr: std::format!("failed to expect prompt: {inner}"),
                             duration: start_time.elapsed(),
                         });
@@ -281,8 +286,10 @@ impl TestCase {
 
         if let Err(inner) = p.expect(expectrl::Eof) {
             return Ok(RunResult {
-                exit_status: ExitStatus::from_raw(1),
-                stdout: read_expectrl_log(log).unwrap_or_default(),
+                exit_status: exited_with(1),
+                stdout: read_expectrl_log(log)
+                    .map(make_expectrl_output_readable)
+                    .unwrap_or_default(),
                 stderr: std::format!("failed to expect EOF: {inner}"),
                 duration: start_time.elapsed(),
             });
@@ -303,7 +310,7 @@ impl TestCase {
 
         match wait_status {
             expectrl::process::unix::WaitStatus::Exited(_, code) => Ok(RunResult {
-                exit_status: ExitStatus::from_raw(code),
+                exit_status: exited_with(code),
                 stdout: cleaned,
                 stderr: String::new(),
                 duration,
@@ -335,19 +342,29 @@ impl TestCase {
             })
         };
 
-        let mut test_cmd = assert_cmd::Command::from_std(cmd);
-
-        test_cmd.timeout(std::time::Duration::from_secs(
+        let timeout = std::time::Duration::from_secs(
             self.timeout_in_seconds
                 .unwrap_or(DEFAULT_TIMEOUT_IN_SECONDS),
-        ));
-
-        if let Some(stdin) = &self.stdin {
-            test_cmd.write_stdin(stdin.as_bytes());
-        }
+        );
 
         let start_time = std::time::Instant::now();
-        let cmd_result = test_cmd.output()?;
+
+        #[cfg(windows)]
+        let cmd_result = crate::windows_job::output_in_job(
+            cmd,
+            self.stdin.as_deref().map(str::as_bytes),
+            timeout,
+        )?;
+
+        #[cfg(not(windows))]
+        let cmd_result = {
+            let mut test_cmd = assert_cmd::Command::from_std(cmd);
+            test_cmd.timeout(timeout);
+            if let Some(stdin) = &self.stdin {
+                test_cmd.write_stdin(stdin.as_bytes());
+            }
+            test_cmd.output()?
+        };
         let duration = start_time.elapsed();
 
         Ok(RunResult {
@@ -357,4 +374,11 @@ impl TestCase {
             duration,
         })
     }
+}
+
+/// Returns the status of a process that exited with the given code.
+#[cfg(pty)]
+fn exited_with(code: i32) -> ExitStatus {
+    // (A raw wait status holds a process's exit code above its low byte.)
+    ExitStatus::from_raw((code & 0xff) << 8)
 }

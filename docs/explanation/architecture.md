@@ -10,6 +10,8 @@ the answer should follow from here. If it doesn't, this document needs updating.
 |---|---|---|
 | `brush-parser` | yes | Tokenizes and parses shell syntax. Knows nothing about a running shell. |
 | `brush-core` | yes | The shell itself: the `Shell` type, expansion, execution, jobs, variables, traps, and programmable completion. Has no line editor or UI of its own. |
+| `brush-clap-adapter` | yes | Implements `brush-core`'s engine-neutral builtin contract for builtins whose arguments are parsed with clap. |
+| `brush-winnow-args-adapter` | yes | The same, for builtins whose arguments are parsed with [winnow-args](https://github.com/lu-zero/winnow-args). |
 | `brush-builtins` | yes | The standard builtins, registered on a `Shell` through `brush-core`'s public API. |
 | `brush-experimental-builtins` | yes | Builtins not ready to be standard. |
 | `brush-coreutils-builtins` | yes | Optional builtins wrapping [uutils/coreutils](https://github.com/uutils/coreutils); doesn't depend on the other crates. |
@@ -17,6 +19,7 @@ the answer should follow from here. If it doesn't, this document needs updating.
 | `brush-shell` | yes | The `brush` binary: its command line, and the wiring of the crates above into a shell. |
 | `brush` | yes | A thin wrapper binary around `brush-shell`. |
 | `brush-test-harness` | no | Runs the YAML test cases that compare brush with bash. |
+| `brush-bundled-tests` | no | Tests the bundled-command shim end to end, against a brush with fake bundled commands. |
 | `xtask`, `fuzz` | no | Development tooling. |
 
 Their dependencies run one way, from front end to parser. Each crate's direct dependencies
@@ -25,11 +28,14 @@ on the others (not counting dev-dependencies) are:
 ```text
 brush                        → brush-shell
 brush-shell                  → brush-interactive, brush-builtins, brush-core,
+                               brush-winnow-args-adapter,
                                brush-experimental-builtins (optional),
                                brush-coreutils-builtins (optional)
 brush-interactive            → brush-core, brush-parser
-brush-builtins               → brush-core, brush-parser
-brush-experimental-builtins  → brush-core
+brush-builtins               → brush-core, brush-parser, brush-winnow-args-adapter
+brush-experimental-builtins  → brush-core, brush-winnow-args-adapter
+brush-clap-adapter           → brush-core
+brush-winnow-args-adapter    → brush-core
 brush-core                   → brush-parser
 brush-parser                 (none)
 brush-coreutils-builtins     (none)
@@ -42,7 +48,8 @@ without its front end. Keep that in mind when deciding what to export.
 
 - Shells are built with `Shell::builder()`, a type-safe builder.
 - `Shell` is generic over `ShellExtensions`, which lets embedders swap in parts of its
-  behavior (today, how errors are formatted) at compile time.
+  behavior (today, how errors are formatted, how processes are launched, and how the
+  tasks the shell runs concurrently with itself are started) at compile time.
 - Platform-specific code lives under the `sys` module, so the rest of the crate stays
   platform-neutral.
 - Each shell has its own working directory (`Shell::working_dir`); brush never changes
@@ -50,6 +57,21 @@ without its front end. Keep that in mind when deciding what to export.
   through a `ResolvedPath`, from `Shell::absolute_path`, rather than a relative path the
   operating system would resolve against the process's directory. Child processes start
   in the shell's working directory (`sys::process::create_command`).
+- Builtins meet the shell at one contract, `brush_core::builtins`, which names no
+  argument-parsing engine. A builtin is a type that is its own parsed arguments: it
+  parses an invocation's words (`ParseArgs`), supplies its help, and runs
+  (`Builtin`), and is registered by type (`Registration::of`). Builtins that parse
+  with clap implement `ParseArgs` through `brush-clap-adapter`, and those that parse
+  with winnow-args through `brush-winnow-args-adapter`.
+- A shell keeps its builtins' registrations, by name, in a `builtins::Registry`
+  (`Shell::builtins`, `Shell::builtins_mut`), which is the one way to look them up,
+  register them, or enable and disable them. How it stores them is private, so
+  that can change (to share them between a shell and its subshells, say) without
+  changing the API.
+- State a builtin keeps between invocations (as `getopts`'s place in its arguments)
+  lives in the shell, kept by its type (`ExecutionContext::state_mut`), and is cloned
+  with the shell, so it follows subshell rules as a variable does. A program embedding
+  the shell can set it beforehand (`Shell::set_builtin_state`).
 
 ## Layering principles
 

@@ -1,19 +1,22 @@
 use brush_core::{ExecutionResult, builtins, callstack};
-use clap::Parser;
 use std::io::Write;
 
 /// Return the context of the current subroutine call.
-#[derive(Parser)]
+#[derive(winnow_args::Args)]
+#[arg(disable_help_short, disable_version_flag, disable_help_subcommand)]
 pub(crate) struct CallerCommand {
     /// The number of call frames to go back.
+    #[arg(positional)]
     expr: Option<usize>,
 }
 
-impl builtins::Command for CallerCommand {
+brush_winnow_args_adapter::impl_parse_args!(CallerCommand);
+
+impl<SE: brush_core::ShellExtensions> builtins::Builtin<SE> for CallerCommand {
     type Error = brush_core::Error;
 
-    async fn execute<SE: brush_core::ShellExtensions>(
-        &self,
+    async fn execute(
+        self,
         context: brush_core::ExecutionContext<'_, SE>,
     ) -> Result<ExecutionResult, Self::Error> {
         let stack = context.shell.call_stack();

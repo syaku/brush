@@ -140,6 +140,21 @@ cases:
       echo "Assign colon-tilde: ${myvar3:=~:~/bin}"
       echo "myvar3 after := ${myvar3}"
 
+  - name: "Tilde expansion: OLDPWD declared without a value"
+    stdin: |
+      printf "<%s>\n" ~- ~-/x
+
+      unset OLDPWD
+      declare OLDPWD
+      printf "<%s>\n" ~-
+
+      unset OLDPWD
+      export OLDPWD
+      printf "<%s>\n" ~-
+
+      OLDPWD=
+      printf "<%s>\n" ~-
+
   - name: "Tilde expansion: out-of-range dir stack index"
     stdin: |
       # A run of digits too large to fit the dir-stack index type isn't a valid
@@ -162,3 +177,12 @@ cases:
       - path: "file.txt.bak"
     stdin: |
       echo ~/{file.txt,file.txt.bak}
+
+  - name: "Tilde expansion: after the = of an assignment-shaped argument"
+    known_failure: true # TODO(expansion): ~ after the = of an assignment-shaped argument to an ordinary command isn't expanded
+    home_dir: .
+    stdin: |
+      test_root=~
+      echo y=~/z | sed "s|${test_root}|ROOT|"
+      builtin export by=~/z; echo "${by//${test_root}/ROOT}"
+      command export cz=~/z; echo "${cz//${test_root}/ROOT}"
